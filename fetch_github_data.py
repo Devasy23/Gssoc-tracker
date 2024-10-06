@@ -1,7 +1,10 @@
 import aiohttp
 import asyncio
 import pymongo
+from gql import gql, Client
+from gql.transport.aiohttp import AIOHTTPTransport
 import os
+import datetime
 import motor.motor_asyncio
 from dotenv import load_dotenv
 
@@ -32,6 +35,108 @@ async def fetch_projects_from_db():
         projects.append(project)
     return projects
 
+
+async def fetch_repo_data(repo_owner, repo_name, project_name, session):
+    query = gql("""
+    query($owner: String!, $name: String!) {
+      repository(owner: $owner, name: $name) {
+        stargazerCount
+        forkCount
+        watchers {
+          totalCount
+        }
+        issues(states: [OPEN, CLOSED]) {
+          totalCount
+        }
+        openIssues: issues(states: [OPEN]) {
+          totalCount
+        }
+        pullRequests(states: [OPEN, CLOSED]) {
+          totalCount
+        }
+        openPullRequests: pullRequests(states: [OPEN]) {
+          totalCount
+        }
+        pullRequestsWithComments: pullRequests(first: 1) {
+          totalCount
+          nodes {
+            comments {
+              totalCount
+            }
+          }
+        }
+        issuesWithComments: issues(first: 1) {
+          totalCount
+          nodes {
+            comments {
+              totalCount
+            }
+          }
+        }
+      }
+    }
+    """)
+
+    transport = AIOHTTPTransport(url='https://api.github.com/graphql', headers={'Authorization': f'Bearer {GITHUB_TOKEN}'})
+    async with Client(transport=transport, fetch_schema_from_transport=True) as client:
+        result = await client.execute(query, variable_values={"owner": repo_owner, "name": repo_name})
+        
+        repo = result['repository']
+        
+        total_prs = repo['pullRequests']['totalCount']
+        total_issues = repo['issues']['totalCount']
+        pr_comments = repo['pullRequestsWithComments']['nodes'][0]['comments']['totalCount'] if repo['pullRequestsWithComments']['nodes'] else 0
+        issue_comments = repo['issuesWithComments']['nodes'][0]['comments']['totalCount'] if repo['issuesWithComments']['nodes'] else 0
+        
+        avg_comments_per_pr = pr_comments / total_prs if total_prs > 0 else 0
+        avg_comments_per_issue = issue_comments / total_issues if total_issues > 0 else 0
+
+        repo_data = {
+            "project_name": project_name,
+            "repo_name": f"{repo_owner}/{repo_name}",
+            "date": datetime.utcnow(),
+            "stars": repo['stargazerCount'],
+            "forks": repo['forkCount'],
+            "watchers": repo['watchers']['totalCount'],
+            "open_issues_count": repo['openIssues']['totalCount'],
+            "closed_issues_count": repo['issues']['totalCount'] - repo['openIssues']['totalCount'],
+            "open_prs_count": repo['openPullRequests']['totalCount'],
+            "closed_prs_count": repo['pullRequests']['totalCount'] - repo['openPullRequests']['totalCount'],
+            "pr_comments_count": pr_comments,
+            "issue_comments_count": issue_comments,
+            "average_comments_per_pr": avg_comments_per_pr,
+            "average_comments_per_issue": avg_comments_per_issue,
+        }
+        return repo_data
+
+# In your main function, you'll need to split the repo_name into owner and name
+async def fetch_all_repo_data():
+    projects = await fetch_projects_from_db()
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for project in projects:
+            github_url = project['github_url']
+            project_name = project['project_name']
+            repo_owner, repo_name = extract_repo_owner_and_name(github_url)
+
+            print(f"Fetching data for: {repo_owner}/{repo_name}")
+            task = asyncio.create_task(fetch_repo_data(repo_owner, repo_name, project_name, session))
+            tasks.append(task)
+        
+        repo_data_list = await asyncio.gather(*tasks)
+        for repo_data in repo_data_list:
+            if repo_data:
+                await save_to_mongo(repo_data)
+                print(f"Saved data for {repo_data['repo_name']}")
+
+def extract_repo_owner_and_name(github_url):
+    try:
+        parts = github_url.replace("https://github.com/", "").split("/")
+        return parts[0], parts[1]
+    except Exception as e:
+        print(f"Invalid GitHub URL: {github_url}")
+        return extract_repo_name(github_url), ""
+
 # Extract repo name from GitHub URL
 def extract_repo_name(github_url):
     return github_url.replace("https://github.com/", "")
@@ -52,36 +157,7 @@ async def fetch_paginated_data(url, session):
             page += 1
     return all_data
 
-# Fetch repo details and aggregate stats (stars, forks, issues, PRs)
-async def fetch_repo_data(repo_name, project_name, session):
-    url = f"https://api.github.com/repos/{repo_name}"
-    async with session.get(url, headers=HEADERS) as response:
-        if response.status == 200:
-            repo = await response.json()
-            open_issues = await fetch_paginated_data(f"https://api.github.com/repos/{repo_name}/issues?state=open", session)
-            closed_issues = await fetch_paginated_data(f"https://api.github.com/repos/{repo_name}/issues?state=closed", session)
-            open_prs = await fetch_paginated_data(f"https://api.github.com/repos/{repo_name}/pulls?state=open", session)
-            closed_prs = await fetch_paginated_data(f"https://api.github.com/repos/{repo_name}/pulls?state=closed", session)
-            
-            repo_data = {
-                "project_name": project_name,
-                "repo_name": repo_name,
-                "stars": repo["stargazers_count"],
-                "forks": repo["forks_count"],
-                "watchers": repo["watchers_count"],
-                "open_issues": repo["open_issues_count"],
-                "closed_issues": len(closed_issues),
-                "open_prs": len(open_prs),
-                "closed_prs": len(closed_prs),
-                "average_open_issues": len(open_issues) / (len(open_issues) + len(closed_issues)) if (open_issues and closed_issues) else 0,
-                "average_closed_issues": len(closed_issues) / (len(open_issues) + len(closed_issues)) if (open_issues and closed_issues) else 0,
-                "average_open_prs": len(open_prs) / (len(open_prs) + len(closed_prs)) if (open_prs and closed_prs) else 0,
-                "average_closed_prs": len(closed_prs) / (len(open_prs) + len(closed_prs)) if (open_prs and closed_prs) else 0
-            }
-            return repo_data
-        else:
-            print(f"Failed to fetch data for {repo_name}")
-            return None
+
 
 # Save repository data to MongoDB
 async def save_to_mongo(repo_data):
@@ -89,26 +165,7 @@ async def save_to_mongo(repo_data):
         repo_data
     )
 
-# Fetch all repo data asynchronously
-async def fetch_all_repo_data():
-    projects = await fetch_projects_from_db()  # Get projects from MongoDB synchronously
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        print(f"Total projects: {len(projects)}")
-        for project in projects:
-            github_url = project['github_url']
-            project_name = project['project_name']
-            repo_name = extract_repo_name(github_url)
 
-            print(f"Fetching data for: {repo_name}")
-            task = asyncio.create_task(fetch_repo_data(repo_name, project_name, session))
-            tasks.append(task)
-        
-        repo_data_list = await asyncio.gather(*tasks)
-        for repo_data in repo_data_list:
-            if repo_data:
-                await save_to_mongo(repo_data)
-                print(f"Saved data for {repo_data['repo_name']}")
 
 # Main entry point
 if __name__ == "__main__":
