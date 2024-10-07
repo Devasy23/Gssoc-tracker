@@ -87,15 +87,23 @@ async def fetch_contributors_count(repo_name, session):
     repo_name = repo_name.removesuffix(".git") if repo_name.endswith(".git") else repo_name
     url = f"https://api.github.com/repos/{repo_name}/contributors"
     headers = {"Authorization": f"Bearer {GITHUB_API_TOKEN}"}
+    contributors_count = 0
+    page = 1
     
-    async with session.get(url, headers=headers) as response:
-        if response.status == 200:
-            contributors = await response.json()
-            return len(contributors)
-        else:
-            print(f"Failed to fetch contributors for {repo_name}, status: {response.status}")
-            return None
-
+    while True:
+        paginated_url = f"{url}?page={page}&per_page=100"  # Fetch up to 100 contributors per page
+        async with session.get(paginated_url, headers=headers) as response:
+            if response.status == 200:
+                contributors = await response.json()
+                if not contributors:
+                    break
+                contributors_count += len(contributors)
+                page += 1
+            else:
+                print(f"Failed to fetch contributors for {repo_name}, status: {response.status}")
+                return None
+    
+    return contributors_count
 # Fetch and combine repo data
 async def fetch_repo_data(repo_name, project_name, session):
     # Fetching REST and GraphQL data
