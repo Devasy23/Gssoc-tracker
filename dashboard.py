@@ -4,11 +4,11 @@ import pandas as pd
 import plotly.express as px
 import os
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
-MONGO_URI = os.getenv("MONGO_URI")
+MONGO_URI = st.secrets["MONGO_URI"]
 
 # Set up MongoDB connection
 client = pymongo.MongoClient(MONGO_URI)
