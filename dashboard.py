@@ -4,9 +4,7 @@ import pandas as pd
 import plotly.express as px
 import os
 from datetime import datetime, timedelta
-# from dotenv import load_dotenv
 
-# load_dotenv()
 
 MONGO_URI = st.secrets["MONGO_URI"]
 
