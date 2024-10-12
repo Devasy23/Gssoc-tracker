@@ -99,12 +99,26 @@ jobs:
         with:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
-                github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: 'Test comment'
+                const { owner, repo } = context.repo;
+                const issue_number = context.issue.number;
+
+                const commmentBody = `Test comment: ${new Date().toISOString()}`;
+
+                await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: commmentBody
                 });
+      - name: Fallback Comment Creation
+        if: failure()
+        uses: actions/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.issue.number || github.event.pull_request.number }}
+          body: |
+            There was an error while trying to create a comment. Please try again later.
+            Time: ${{ steps.date.outputs.date }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   collect-stats:
     runs-on: ubuntu-latest
