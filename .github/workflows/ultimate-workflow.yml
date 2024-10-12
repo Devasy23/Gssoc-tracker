@@ -13,10 +13,7 @@ on:
 jobs:
   greet-and-process:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      pull-requests: write
-      contents: read
+    permissions: write-all
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
