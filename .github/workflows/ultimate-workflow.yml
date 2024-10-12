@@ -118,7 +118,7 @@ jobs:
           body: |
             There was an error while trying to create a comment. Please try again later.
             Time: ${{ steps.date.outputs.date }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GIT_PAT }}
       - name: Debug info
         run: |
           echo "Event name: ${{ github.event_name }}"
