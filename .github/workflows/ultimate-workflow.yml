@@ -94,39 +94,37 @@ jobs:
               issue_number: issue.number,
               assignees: [assignee]
             });
-      - name: Test Comment
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const { owner, repo } = context.repo;
-                const issue_number = context.issue.number;
 
-                const commmentBody = `Test comment: ${new Date().toISOString()}`;
-
-                await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body: commmentBody
-                });
-      - name: Fallback Comment Creation
-        if: failure()
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          issue-number: ${{ github.event.issue.number || github.event.pull_request.number }}
-          body: |
-            There was an error while trying to create a comment. Please try again later.
-            Time: ${{ steps.date.outputs.date }}
-          token: ${{ secrets.GIT_PAT }}
-      - name: Debug info
+      - name: Create comment using gh CLI
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
         run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Event action: ${{ github.event.action }}"
-          echo "Event issue number: ${{ github.event.issue.number }}"
-          echo "Event pull request number: ${{ github.event.pull_request.number }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Actor: ${{ github.actor }}"
+            if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue comment $ISSUE_NUMBER --repo ${{ github.repository }} --body "Test comment created using gh CLI: $(date -u)"
+            else
+            echo "No issue or pull request number found."
+            fi
+        
+        
+      - name: Debug information
+        run: |
+            echo "Event name: ${{ github.event_name }}"
+            echo "Action: ${{ github.event.action }}"
+            echo "Issue/PR number: ${{ github.event.issue.number || github.event.pull_request.number }}"
+            echo "Repository: ${{ github.repository }}"
+            echo "Actor: ${{ github.actor }}"
+            echo "GITHUB_TOKEN permissions:"
+            gh api /repos/${{ github.repository }}/actions/permissions/workflow
+        
+        
+      - name: Check Action Permissions
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+            echo "Checking repository permissions..."
+            gh api repos/${{ github.repository }} --jq '.permissions'
+          
 
   collect-stats:
     runs-on: ubuntu-latest
