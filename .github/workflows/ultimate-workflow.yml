@@ -100,7 +100,8 @@ jobs:
     outputs:
       comment: ${{ steps.set-comment.outputs.comment }}
     permissions:
-        pull-requests: read
+        pull-requests: write
+        issues: write
     steps:
       - name: Collect PR stats
     #   - name: Comment contributor stats
@@ -159,7 +160,7 @@ jobs:
 
   post-comment:
     runs-on: ubuntu-latest
-    needs: collect-stats
+    # needs: collect-stats
     permissions:
         issues: write  # To allow posting comments
     steps:
@@ -170,15 +171,17 @@ jobs:
             script: |
                 const { owner, repo } = context.repo;
                 const issue_number = context.payload.pull_request.number;
-
-                const comment = `{{ needs.collect-stats.outputs.comment }}`;
+                const prAuthorUsername = context.payload.pull_request.user.login;  // Get the author's username
+                
+                // Prepare the comment with the GitHub stats image
+                const comment = `![Author's GitHub stats](https://github-readme-stats.vercel.app/api?username=${prAuthorUsername}&show_icons=true&theme=radical)`;
 
                 // Post the comment on the pull request
                 await github.rest.issues.createComment({
-                    owner,
-                    repo,
-                    issue_number,
-                    body: comment
+                owner,
+                repo,
+                issue_number,
+                body: comment
                 });
 
       - name: Label based on file changes
