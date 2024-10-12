@@ -95,41 +95,41 @@ jobs:
             });
 
 
-            - name: Comment contributor stats
-            if: github.event_name == 'pull_request' && github.event.action == 'opened'
-            uses: actions/github-script@v6
-            with:
-              github-token: ${{secrets.GITHUB_TOKEN}}
-              script: |
+      - name: Comment contributor stats
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/github-script@v6
+        with:
+            github-token: ${{secrets.GITHUB_TOKEN}}
+            script: |
                 const { owner, repo } = context.repo;
                 const creator = context.payload.pull_request.user.login;
-          
+            
                 // Updated GraphQL query without 'author' filter
                 const query = `query($owner:String!, $repo:String!) {
-                  repository(owner:$owner, name:$repo) {
+                    repository(owner:$owner, name:$repo) {
                     pullRequests(first:100, states:MERGED, orderBy:{field:CREATED_AT, direction:DESC}) {
-                      totalCount
-                      nodes {
+                        totalCount
+                        nodes {
                         author {
-                          login
+                            login
                         }
                         additions
                         deletions
-                      }
+                        }
                     }
-                  }
+                    }
                 }`;
-          
+            
                 const result = await github.graphql(query, { owner, repo });
-          
+            
                 // Filter the pull requests by the author (creator)
                 const prs = result.repository.pullRequests.nodes.filter(pr => pr.author.login === creator);
                 const totalPRs = prs.length;
                 const recentPRs = prs.slice(0, 10); // Get the last 10 PRs
-          
+            
                 const totalAdditions = recentPRs.reduce((sum, pr) => sum + pr.additions, 0);
                 const totalDeletions = recentPRs.reduce((sum, pr) => sum + pr.deletions, 0);
-          
+            
                 const message = `
                 📊 Contributor Stats for @${creator}:
                 
@@ -140,13 +140,14 @@ jobs:
                 
                 Keep up the great work! 🚀
                 `;
-          
+            
                 github.rest.issues.createComment({
-                  owner,
-                  repo,
-                  issue_number: context.payload.pull_request.number,
-                  body: message
-                });          
+                    owner,
+                    repo,
+                    issue_number: context.payload.pull_request.number,
+                    body: message
+                });
+        
 
 
       - name: Label based on file changes
