@@ -23,7 +23,7 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'issues'
         uses: actions/github-script@v6
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{secrets.PAT_TOKEN}}
           script: |
             const { owner, repo } = context.repo;
             const creator = context.payload.sender.login;
