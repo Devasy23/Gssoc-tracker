@@ -3,6 +3,18 @@
 
 ![GSSOC-Tracker Banner](GS_logo_White.svg)
 
+## Table of Contents
+
+- [About](#-about)
+- [Features](#-features)
+	- [Leaderboard](#1-leaderboard-)
+	- [Per-Repo Timeline](#2-per-repo-timeline-)
+	- [Project Comparison](#3-project-comparison-)
+- [How It Works](#-how-it-works)
+- [Getting Started](#-getting-started)
+- [Featured Projects](#-featured-projects)
+- [License](#-license)
+- [Acknowledgements](#-acknowledgements)
 
 ## 🌟 About
 
