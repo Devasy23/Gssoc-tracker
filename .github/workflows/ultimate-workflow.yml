@@ -8,6 +8,8 @@ on:
     types: [opened]
   issue_comment:
     types: [created]
+  pull_request_target:
+    types: [opened, synchronize]
 
 
 jobs:
@@ -94,39 +96,21 @@ jobs:
               issue_number: issue.number,
               assignees: [assignee]
             });
-      - name: Test Comment
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const { owner, repo } = context.repo;
-                const issue_number = context.issue.number;
 
-                const commmentBody = `Test comment: ${new Date().toISOString()}`;
-
-                await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body: commmentBody
-                });
-      - name: Fallback Comment Creation
-        if: failure()
-        uses: peter-evans/create-or-update-comment@v2
-        with:
-          issue-number: ${{ github.event.issue.number || github.event.pull_request.number }}
-          body: |
-            There was an error while trying to create a comment. Please try again later.
-            Time: ${{ steps.date.outputs.date }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Debug info
+      - name: Create comment using gh CLI
+        env:
+            GH_TOKEN: ${{ secrets.GIT_PAT }}
+            ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
         run: |
-          echo "Event name: ${{ github.event_name }}"
-          echo "Event action: ${{ github.event.action }}"
-          echo "Event issue number: ${{ github.event.issue.number }}"
-          echo "Event pull request number: ${{ github.event.pull_request.number }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Actor: ${{ github.actor }}"
+            if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue comment $ISSUE_NUMBER --repo ${{ github.repository }} --body "Test comment created using gh CLI: $(date -u)"
+            else
+            echo "No issue or pull request number found."
+            fi
+        
+        
+
+          
 
   collect-stats:
     runs-on: ubuntu-latest
@@ -136,64 +120,75 @@ jobs:
         pull-requests: write
         issues: write
     steps:
-      - name: Collect PR stats
-    #   - name: Comment contributor stats
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+      - name: Check Token Permissions
         uses: actions/github-script@v6
         with:
-            github-token: ${{secrets.GITHUB_TOKEN}}
+            github-token: ${{ secrets.GITHUB_TOKEN }}
             script: |
-                const { owner, repo } = context.repo;
-                const creator = context.payload.pull_request.user.login;
-            
-                // Updated GraphQL query without 'author' filter
-                const query = `query($owner:String!, $repo:String!) {
-                    repository(owner:$owner, name:$repo) {
-                    pullRequests(first:100, states:MERGED, orderBy:{field:CREATED_AT, direction:DESC}) {
-                        totalCount
-                        nodes {
-                        author {
-                            login
-                        }
-                        additions
-                        deletions
-                        }
-                    }
-                    }
-                }`;
-            
-                const result = await github.graphql(query, { owner, repo });
-            
-                // Filter the pull requests by the author (creator)
-                const prs = result.repository.pullRequests.nodes.filter(pr => pr.author.login === creator);
-                const totalPRs = prs.length;
-                const recentPRs = prs.slice(0, 10); // Get the last 10 PRs
-            
-                const totalAdditions = recentPRs.reduce((sum, pr) => sum + pr.additions, 0);
-                const totalDeletions = recentPRs.reduce((sum, pr) => sum + pr.deletions, 0);
-            
-                const message = `
-                📊 Contributor Stats for @${creator}:
-                
-                Total PRs Merged: ${totalPRs}
-                Recent Contributions (last 10 PRs):
-                - Lines Added: ${totalAdditions}
-                - Lines Deleted: ${totalDeletions}
-                
-                Keep up the great work! 🚀
-                `;
-            
-                github.rest.issues.createComment({
-                    owner,
-                    repo,
-                    issue_number: context.payload.pull_request.number,
-                    body: message
+                const permissions = await github.rest.apps.getRepoPermissionsForAuthenticatedUser({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo
                 });
+                console.log('Permissions: ', permissions.data);
+
+      - name: Collect PR stats
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              const { owner, repo } = context.repo;
+              const creator = context.payload.pull_request.user.login;
+              
+              const query = `query($owner:String!, $repo:String!) {
+                  repository(owner:$owner, name:$repo) {
+                  pullRequests(first:100, states:MERGED, orderBy:{field:CREATED_AT, direction:DESC}) {
+                      totalCount
+                      nodes {
+                      author {
+                          login
+                      }
+                      additions
+                      deletions
+                      }
+                  }
+                  }
+              }`;
+              
+              const result = await github.graphql(query, { owner, repo });
+              const prs = result.repository.pullRequests.nodes.filter(pr => pr.author.login === creator);
+              const totalPRs = prs.length;
+              const recentPRs = prs.slice(0, 10);
+              const totalAdditions = recentPRs.reduce((sum, pr) => sum + pr.additions, 0);
+              const totalDeletions = recentPRs.reduce((sum, pr) => sum + pr.deletions, 0);
+      
+              const message = `
+              📊 Contributor Stats for @${creator}:
+              
+              Total PRs Merged: ${totalPRs}
+              Recent Contributions (last 10 PRs):
+              - Lines Added: ${totalAdditions}
+              - Lines Deleted: ${totalDeletions}
+              
+              Keep up the great work! 🚀
+              `;
+      
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: context.payload.pull_request.number,
+                body: message
+              });
+            } catch (error) {
+              console.log('Error:', error);
+              throw error;  // Re-throw error after logging it
+            }
+      
         
 
   post-comment:
     runs-on: ubuntu-latest
-    # needs: collect-stats
+    needs: collect-stats
     permissions:
         issues: write  # To allow posting comments
     steps:
