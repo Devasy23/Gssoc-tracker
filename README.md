@@ -70,7 +70,7 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ## 📝 License
 
 
-This project is licensed under the [BSD3 License](LICENSE).
+This project is licensed under the [BSD3 License](LICENSE)
 
 
 ## 🙏 Acknowledgements
