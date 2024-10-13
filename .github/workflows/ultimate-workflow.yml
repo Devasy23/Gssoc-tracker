@@ -97,7 +97,7 @@ jobs:
       - name: Test Comment
         uses: actions/github-script@v6
         with:
-            github-token: ${{ secrets.PAT_TOKEN}}
+            github-token: ${{secrets.PAT_TOKEN}}
             script: |
                 const { owner, repo } = context.repo;
                 const issue_number = context.issue.number;
