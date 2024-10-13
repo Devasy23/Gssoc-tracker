@@ -97,16 +97,30 @@ jobs:
               assignees: [assignee]
             });
 
-      - name: Create comment using gh CLI
-        env:
-            GH_TOKEN: ${{ secrets.GIT_PAT }}
-            ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
-        run: |
-            if [ -n "$ISSUE_NUMBER" ]; then
-            gh issue comment $ISSUE_NUMBER --repo ${{ github.repository }} --body "Test comment created using gh CLI: $(date -u)"
-            else
-            echo "No issue or pull request number found."
-            fi
+    #   - name: Create comment using gh CLI
+    #     env:
+    #         GH_TOKEN: ${{ secrets.GIT_PAT }}
+    #         ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+    #     run: |
+    #         if [ -n "$ISSUE_NUMBER" ]; then
+    #         gh issue comment $ISSUE_NUMBER --repo ${{ github.repository }} --body "Test comment created using gh CLI: $(date -u)"
+    #         else
+    #         echo "No issue or pull request number found."
+    #         fi
+      - name: Check Token Permissions
+        uses: actions/github-script@v6
+        with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            script: |
+                const { owner, repo } = context.repo;
+                const username = context.actor;  // The user triggering the workflow
+                
+                const permissions = await github.rest.repos.getCollaboratorPermissionLevel({
+                    owner,
+                    repo,
+                    username
+                });
+                console.log('Permissions: ', permissions.data);
         
         
 
@@ -120,17 +134,6 @@ jobs:
         pull-requests: write
         issues: write
     steps:
-      - name: Check Token Permissions
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const permissions = await github.rest.apps.getRepoPermissionsForAuthenticatedUser({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo
-                });
-                console.log('Permissions: ', permissions.data);
-
       - name: Collect PR stats
         uses: actions/github-script@v6
         with:
