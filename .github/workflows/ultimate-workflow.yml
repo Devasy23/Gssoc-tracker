@@ -97,35 +97,6 @@ jobs:
               assignees: [assignee]
             });
 
-    #   - name: Create comment using gh CLI
-    #     env:
-    #         GH_TOKEN: ${{ secrets.GIT_PAT }}
-    #         ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
-    #     run: |
-    #         if [ -n "$ISSUE_NUMBER" ]; then
-    #         gh issue comment $ISSUE_NUMBER --repo ${{ github.repository }} --body "Test comment created using gh CLI: $(date -u)"
-    #         else
-    #         echo "No issue or pull request number found."
-    #         fi
-      - name: Check Token Permissions
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const { owner, repo } = context.repo;
-                const username = context.actor;  // The user triggering the workflow
-                
-                const permissions = await github.rest.repos.getCollaboratorPermissionLevel({
-                    owner,
-                    repo,
-                    username
-                });
-                console.log('Permissions: ', permissions.data);
-        
-        
-
-          
-
   collect-stats:
     runs-on: ubuntu-latest
     outputs:
@@ -137,7 +108,7 @@ jobs:
       - name: Collect PR stats
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             try {
               const { owner, repo } = context.repo;
@@ -191,30 +162,10 @@ jobs:
 
   post-comment:
     runs-on: ubuntu-latest
-    needs: collect-stats
+    # needs: collect-stats
     permissions:
         issues: write  # To allow posting comments
     steps:
-      - name: Post Comment
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const { owner, repo } = context.repo;
-                const issue_number = context.payload.pull_request.number;
-                const prAuthorUsername = context.payload.pull_request.user.login;  // Get the author's username
-                
-                // Prepare the comment with the GitHub stats image
-                const comment = `![Author's GitHub stats](https://github-readme-stats.vercel.app/api?username=${prAuthorUsername}&show_icons=true&theme=radical)`;
-
-                // Post the comment on the pull request
-                await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number,
-                body: comment
-                });
-
       - name: Label based on file changes
         if: github.event_name == 'pull_request' && github.event.action == 'opened'
         uses: actions/github-script@v6
