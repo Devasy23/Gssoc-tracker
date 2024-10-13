@@ -118,6 +118,17 @@ jobs:
         pull-requests: write
         issues: write
     steps:
+      - name: Check Token Permissions
+        uses: actions/github-script@v6
+        with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            script: |
+                const permissions = await github.rest.apps.getRepoPermissionsForAuthenticatedUser({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo
+                });
+                console.log('Permissions: ', permissions.data);
+
       - name: Collect PR stats
         uses: actions/github-script@v6
         with:
