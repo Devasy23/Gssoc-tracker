@@ -8,8 +8,6 @@ on:
     types: [opened]
   issue_comment:
     types: [created]
-  pull_request_target:
-    types: [opened, synchronize]
 
 
 jobs:
@@ -107,20 +105,7 @@ jobs:
     #         else
     #         echo "No issue or pull request number found."
     #         fi
-      - name: Check Token Permissions
-        uses: actions/github-script@v6
-        with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-                const { owner, repo } = context.repo;
-                const username = context.actor;  // The user triggering the workflow
-                
-                const permissions = await github.rest.repos.getCollaboratorPermissionLevel({
-                    owner,
-                    repo,
-                    username
-                });
-                console.log('Permissions: ', permissions.data);
+
         
         
 
@@ -137,7 +122,7 @@ jobs:
       - name: Collect PR stats
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             try {
               const { owner, repo } = context.repo;
@@ -198,7 +183,7 @@ jobs:
       - name: Post Comment
         uses: actions/github-script@v6
         with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
+            github-token: ${{ secrets.PAT_TOKEN }}
             script: |
                 const { owner, repo } = context.repo;
                 const issue_number = context.payload.pull_request.number;
@@ -219,7 +204,7 @@ jobs:
         if: github.event_name == 'pull_request' && github.event.action == 'opened'
         uses: actions/github-script@v6
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{secrets.PAT_TOKEN}}
           script: |
             const { owner, repo } = context.repo;
             const prNumber = context.payload.pull_request.number;
