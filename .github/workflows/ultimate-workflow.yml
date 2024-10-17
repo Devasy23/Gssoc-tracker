@@ -76,7 +76,7 @@ jobs:
         if: github.event_name == 'issues' && github.event.action == 'opened'
         uses: actions/github-script@v6
         with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
+          github-token: ${{secrets.PAT_TOKEN}}
           script: |
             const issue = context.payload.issue;
             const labels = issue.labels.map(label => label.name);
