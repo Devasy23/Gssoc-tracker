@@ -30,17 +30,17 @@ def calculate_gains(df, period='overall'):
     df['days_since_reference'] = (df['date_fetched'] - reference_date).dt.days
    
     if period == 'overall':
-        latest_df = df.sort_values('date_fetched').groupby('repo_name').last()
-        earliest_df = df.sort_values('date_fetched').groupby('repo_name').first()
+        latest_df = df.sort_values('days_since_reference').groupby('repo_name').last()
+        earliest_df = df.sort_values('days_since_reference').groupby('repo_name').first()
         for metric in metrics:
             latest_df[f"{metric}_gain"] = latest_df[metric] - earliest_df[metric]
     elif period == 'daily':
-        latest_df = df.sort_values('date_fetched').groupby('repo_name').last()
+        latest_df = df.sort_values('days_since_reference').groupby('repo_name').last()
         one_day_ago_df = df[df['days_since_reference'] == latest_df['days_since_reference'].max() - 1].groupby('repo_name').last()
         for metric in metrics:
             latest_df[f"{metric}_daily_gain"] = latest_df[metric] - one_day_ago_df[metric]
     elif period == 'weekly':
-        latest_df = df.sort_values('date_fetched').groupby('repo_name').last()
+        latest_df = df.sort_values('days_since_reference').groupby('repo_name').last()
         week_ago_df = df[df['days_since_reference'] >= latest_df['days_since_reference'].max() - 7].groupby('repo_name').first()
         for metric in metrics:
             latest_df[f"{metric}_weekly_gain"] = latest_df[metric] - week_ago_df[metric]
